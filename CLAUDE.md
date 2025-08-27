@@ -1,0 +1,1 @@
+- store the project plan, issues during development, troubleshooting steps and successes in the docs/ directory
