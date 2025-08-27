@@ -1,43 +1,73 @@
 import SwiftUI
 
 struct AccountListView: View {
+    let accounts: [Account]
     @EnvironmentObject var totpService: TOTPService
     @State private var selectedAccount: Account?
+    @State private var accountToDelete: Account?
+    @State private var showingDeleteAlert = false
+    
+    init(accounts: [Account]? = nil) {
+        self.accounts = accounts ?? []
+    }
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(totpService.accounts) { account in
+            LazyVStack(spacing: 12) {
+                ForEach(accounts.isEmpty ? totpService.accounts : accounts) { account in
                     AccountRowView(account: account)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(selectedAccount?.id == account.id ? Color.accentColor.opacity(0.1) : Color.clear)
-                        )
-                        .onTapGesture {
-                            selectedAccount = account
-                        }
                         .contextMenu {
-                            Button("Copy Code") {
+                            Button(action: {
                                 if let code = totpService.getCurrentCode(for: account) {
                                     let pasteboard = NSPasteboard.general
                                     pasteboard.declareTypes([.string], owner: nil)
                                     pasteboard.setString(code.code, forType: .string)
                                 }
+                            }) {
+                                Label("Copy Code", systemImage: "doc.on.doc")
                             }
                             
-                            Button("Refresh Code") {
+                            Button(action: {
                                 _ = totpService.refreshCode(for: account)
+                            }) {
+                                Label("Refresh Code", systemImage: "arrow.clockwise")
                             }
                             
                             Divider()
                             
-                            Button("Delete Account", role: .destructive) {
-                                _ = totpService.deleteAccount(account)
+                            Button(action: {
+                                accountToDelete = account
+                                showingDeleteAlert = true
+                            }) {
+                                Label("Delete Account", systemImage: "trash")
                             }
                         }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
+                        ))
                 }
             }
-            .padding()
+            .padding(24)
+            .padding(.top, 8)
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+        .alert("Delete Account", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {
+                accountToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let account = accountToDelete {
+                    withAnimation(.spring(response: 0.4)) {
+                        _ = totpService.deleteAccount(account)
+                    }
+                    accountToDelete = nil
+                }
+            }
+        } message: {
+            if let account = accountToDelete {
+                Text("Are you sure you want to delete the account for \(account.displayName)? This action cannot be undone.")
+            }
         }
     }
 }
@@ -52,5 +82,5 @@ struct AccountListView: View {
             return service
         }())
         .environmentObject(TOTPGenerator())
-        .frame(width: 400, height: 500)
+        .frame(width: 500, height: 600)
 }
